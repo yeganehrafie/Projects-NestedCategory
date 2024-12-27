@@ -1,0 +1,199 @@
+import React, { useState, useEffect } from "react";
+import InputParent from "./inputParent";
+
+const TaskList = () => {
+  const lists = [
+    {
+      id: "1",
+      name: "Task 1",
+      children: [],
+    },
+  ];
+  const [tasks, setTasks] = useState(() => {
+    const savedTasks = localStorage.getItem("taskLists");
+    return savedTasks ? JSON.parse(savedTasks) : lists;
+  });
+  const [copiedTasks, setCopiedTasks] = useState([]);
+  useEffect(() => {
+    const listArray = JSON.parse(localStorage.getItem("taskLists"));
+    if (listArray) {
+      setTasks(listArray);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("taskLists", JSON.stringify(tasks));
+  }, [tasks]);
+
+  const addTask = (id, taskName) => {
+    if (!taskName.trim()) return;
+
+    const newTask = { id: Date.now().toString(), name: taskName, children: [] };
+
+    const updatedTasks = tasks.map((task) => {
+      if (task.id === id) {
+        return { ...task, children: [...(task.children || []), newTask] };
+      }
+      if (task.children) {
+        return {
+          ...task,
+          children: addTaskToChildren(task.children, id, newTask),
+        };
+      }
+      return task;
+    });
+
+    setTasks(updatedTasks);
+  };
+
+  const addTaskToChildren = (children, parentId, newTask) => {
+    return children.map((child) => {
+      if (child.id === parentId) {
+        return { ...child, children: [...(child.children || []), newTask] };
+      } else if (child.children.length > 0) {
+        return {
+          ...child,
+          children: addTaskToChildren(child.children, parentId, newTask),
+        };
+      }
+      return child;
+    });
+  };
+  const deleteTask = (tasks, id) => {
+    return tasks.reduce((acc, task) => {
+      if (task.id === id) {
+        return acc;
+      }
+      if (task.children) {
+        task.children = deleteTask(task.children, id);
+      }
+      acc.push(task);
+      return acc;
+    }, []);
+  };
+
+  const handleDeleted = (id) => {
+    const updatedTasks = deleteTask(tasks, id);
+    setTasks(updatedTasks);
+  };
+
+  const updateTask = (tasks, id, newTaskName) => {
+    return tasks.map((task) => {
+      if (task.id === id) {
+        return { ...task, name: newTaskName };
+      }
+      if (task.children) {
+        task.children = updateTask(task.children, id, newTaskName);
+      }
+      return task;
+    });
+  };
+
+  const handleUpdate = (id) => {
+    const newTaskName = prompt("Enter new task name:");
+    if (newTaskName && newTaskName.trim()) {
+      const updatedTasks = updateTask(tasks, id, newTaskName);
+      setTasks(updatedTasks);
+    }
+  };
+
+  const deepCopyTask = (task) => {
+    return {
+      ...task,
+      children: task.children ? task.children.map(deepCopyTask) : [],
+    };
+  };
+
+  const handleCopy = (task) => {
+    const copiedTask = deepCopyTask(task);
+    setCopiedTasks((prev) => [...prev, copiedTask]);
+    alert(`Copied task: ${task.name} with all its children and grandchildren`);
+  };
+
+  return (
+    <>
+      {tasks.map((task) => (
+        <InputParent
+          key={task.id}
+          task={task}
+          addTask={addTask}
+          handleDeleted={handleDeleted}
+          handleUpdate={handleUpdate}
+          handleCopy={handleCopy}
+        />
+      ))}
+      {copiedTasks.length > 0 && (
+        <div className="container mx-auto max-w-screen-lg min-w-full px-4 mt-6">
+          {copiedTasks.map((copiedTask, index) => (
+            <div
+              key={index}
+              className="mt-10 border-2 border-neutral-200 p-5 m-3 font-semibold bg-gray-100"
+            >
+              <h3 className="text-lg text-slate-700">{copiedTask.name}</h3>
+
+              <input
+                type="text"
+                placeholder="New task ..."
+                className="mt-6 border-2 border-stone-400 rounded-md p-2 text-md outline-none duration-700 md:w-2/5 sm:w-auto"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    addTask(copiedTask.id, e.target.value);
+                    e.target.value = ""; // پاک کردن ورودی
+                  }
+                }}
+              />
+
+              <button
+                className="bg-blue-600 p-2 border-0 outline-none rounded-md text-md text-slate-50 cursor-pointer duration-700 hover:bg-blue-500 mt-3 mx-3 sm:w-auto"
+                onClick={() => {
+                  const inputValue = document.querySelector(
+                    `input[placeholder="New task ..."]`
+                  ).value;
+                  addTask(copiedTask.id, inputValue);
+                  document.querySelector(
+                    `input[placeholder="New task ..."]`
+                  ).value = ""; // پاک کردن ورودی
+                }}
+              >
+                Add Item
+              </button>
+              <button
+                className="bg-red-700 p-2 border-0 outline-none rounded-md text-md text-slate-50 cursor-pointer duration-700 hover:bg-red-600 mt-3 mx-3 sm:w-auto"
+                onClick={() => handleDeleted(copiedTask.id)}
+              >
+                Delete Item
+              </button>
+              <button
+                className="bg-yellow-400 p-2 border-0 outline-none rounded-md text-md text-slate-50 cursor-pointer duration-700 hover:bg-yellow-300 mt-3 mx-3 sm:w-auto"
+                onClick={() => handleUpdate(copiedTask.id)}
+              >
+                Update Item
+              </button>
+              <button
+                className="bg-green-500 p-2 border-0 outline-none rounded-md text-md text-slate-50 cursor-pointer duration-700 hover:bg-green-400 mt-3 mx-3 sm:w-auto"
+                onClick={() => handleCopy(copiedTask)}
+              >
+                Copy Item
+              </button>
+
+              {copiedTask.children.length > 0 && (
+                <div className="ml-4">
+                  {copiedTask.children.map((child) => (
+                    <div
+                      key={child.id}
+                      className="border-0 p-3 m-1 bg-gray-200 mt-6"
+                    >
+                      <h4 className="text-md text-slate-700">{child.name}</h4>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+};
+
+export default TaskList;
